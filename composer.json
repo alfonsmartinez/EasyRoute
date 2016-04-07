@@ -1,0 +1,22 @@
+{
+  "name": "easy/easyroute",
+  "description": "Fast, fully featured restful request router for PHP",
+  "keywords": ["routing", "router"],
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Alfons",
+      "email": "alfonsmartinezparra@gmail.com"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "EasyRoute\\": "src/EasyRoute"
+    }
+  },
+  "require": {
+    "php": ">=5.6.0"
+  },
+  "require-dev": {
+  }
+}

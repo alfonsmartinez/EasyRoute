@@ -1,7 +1,12 @@
 {
   "name": "easyroute/easyroute",
+  "type": "library",
   "description": "Fast, fully featured restful request router for PHP",
-  "keywords": ["routing", "router"],
+  "homepage": "https://github.com/alfonsmartinez/EasyRoute",
+  "keywords": [
+    "routing",
+    "router"
+  ],
   "license": "MIT",
   "authors": [
     {
@@ -9,8 +14,6 @@
       "email": "alfonsmartinezparra@gmail.com"
     }
   ],
-  "minimum-stability": "dev",
-  "prefer-stable" : true,
   "autoload": {
     "psr-4": {
       "EasyRoute\\": "src/EasyRoute"
@@ -18,5 +21,8 @@
   },
   "require": {
     "php": ">=5.6.0"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "*"
   }
 }

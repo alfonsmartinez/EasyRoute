@@ -24,5 +24,8 @@
   },
   "require-dev": {
     "phpunit/phpunit": "*"
+  },
+  "suggest" : {
+    "symfony/http-foundation" : "Use Symfony Request components"
   }
 }

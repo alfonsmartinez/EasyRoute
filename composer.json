@@ -1,5 +1,5 @@
 {
-  "name": "easy/easyroute",
+  "name": "easyroute/easyroute",
   "description": "Fast, fully featured restful request router for PHP",
   "keywords": ["routing", "router"],
   "license": "MIT",

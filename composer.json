@@ -5,7 +5,7 @@
   "license": "MIT",
   "authors": [
     {
-      "name": "Alfons",
+      "name": "Alfons Martinez",
       "email": "alfonsmartinezparra@gmail.com"
     }
   ],
@@ -16,7 +16,5 @@
   },
   "require": {
     "php": ">=5.6.0"
-  },
-  "require-dev": {
   }
 }

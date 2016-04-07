@@ -104,10 +104,11 @@ class RouteCollection
      */
     public function getArrayMap()
     {
+
         return [
             'base_uri' => $this->base_uri,
             'prefixs'  => $this->prefixs,
-            'routes'   => $this->routes,
+            'routes'   => $this->_orderRoutes(),
             'reverse'  => $this->reverse,
             'filters'  => $this->filters
         ];
@@ -151,5 +152,19 @@ class RouteCollection
             $prefix = '/' . $prefix . '/';
         }
         return $prefix;
+    }
+
+    /**
+     * @return array
+     */
+    private function _orderRoutes()
+    {
+        foreach($this->routes as $method => $routes){
+            usort($this->routes[$method], function($a, $b) {
+                return $a['domain'] - $b['domain'];
+            });
+        }
+
+        return $this->routes;
     }
 }

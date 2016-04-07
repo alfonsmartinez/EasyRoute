@@ -52,7 +52,7 @@ class Router
      */
     public function map($httpMethod, $route, $controller)
     {
-        $this->collection->addRoute($httpMethod, $route, end($this->group_options), $controller);
+        $this->collection->addRoute($httpMethod, $route, $this->_getGroupOptions(), $controller);
         return $this;
     }
 
@@ -197,6 +197,15 @@ class Router
     private function _resetGroupOptions()
     {
         array_pop($this->group_options);
+    }
+
+    /**
+     * @return array
+     */
+    private function _getGroupOptions()
+    {
+        $options = end($this->group_options);
+        return (is_array($options)) ? $options : [];
     }
 
 }

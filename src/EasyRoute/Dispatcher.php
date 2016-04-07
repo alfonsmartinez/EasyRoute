@@ -79,11 +79,10 @@ class Dispatcher
         $flag = false;
 
         foreach ($routes as $route) {
-
             $route_pattern = $route['regex'];
-            if (preg_match($route_pattern, $requestUrl, $arguments)) {
-                // Check the domain
-                $domain_args = $this->_checkDomain($route, $domain);
+            if (preg_match($route_pattern, $requestUrl, $arguments) && $domain_args = $this->_checkDomain($route,
+                    $domain)
+            ) {
 
                 $arguments["request_uri"] = $requestUrl;
                 $parameters = array_merge($domain_args, $arguments);
@@ -137,10 +136,6 @@ class Dispatcher
         $domain = $request->getHost();
         $uri = $request->getBasePath();
 
-        if (empty($this->route_map['reverse'][$domain])) {
-            throw new BadRouteException("Esta ruta no existe");
-        }
-
         $this->_checkBaseURI($uri);
 
         $uri = str_replace($this->route_map['base_uri'], "", $uri);
@@ -170,11 +165,6 @@ class Dispatcher
      */
     public function getUrlRequest($name, $options, $uri, $domain = "")
     {
-
-        if (empty($this->route_map['reverse'][$domain])) {
-            throw new BadRouteException("Esta ruta no existe");
-        }
-
         $this->_checkBaseURI($uri);
 
         $uri = str_replace($this->route_map['base_uri'], "", $uri);
@@ -214,7 +204,13 @@ class Dispatcher
      */
     private function _getRoute($name, $domain, $prefix)
     {
-        $route = $this->route_map['reverse'][$domain][$name];
+        if (!empty($this->route_map['reverse'][$domain]) && !empty($this->route_map['reverse'][$domain][$name])) {
+            $route = $this->route_map['reverse'][$domain][$name];
+        } elseif (!empty($this->route_map['reverse'][''][$name])) {
+            $route = $this->route_map['reverse'][''][$name];
+        } else {
+            throw new BadRouteException("Esta ruta no existe");
+        }
 
         if (count($route) > 1) {
             foreach ($route as $item) {
@@ -352,18 +348,15 @@ class Dispatcher
      * @param $route
      * @param $domain
      * @return array
-     * @throws HttpRouteNotFoundException
      */
     private function _checkDomain($route, $domain)
     {
-
         if (!empty($route['domain']) && $route['domain'] != $domain) {
-            throw new HttpRouteNotFoundException(404);
+            return false;
         } else {
             return [
                 'domain' => $domain
             ];
         }
-
     }
 }

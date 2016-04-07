@@ -23,7 +23,8 @@
     "php": ">=5.6.0"
   },
   "require-dev": {
-    "phpunit/phpunit": "*"
+    "phpunit/phpunit": "*",
+    "phpunit/phpunit-skeleton-generator": "^2.0"
   },
   "suggest" : {
     "symfony/http-foundation" : "Use Symfony Request components"

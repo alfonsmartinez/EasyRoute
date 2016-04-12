@@ -36,11 +36,11 @@ class Router
      */
     public function group(array $options, \Closure $callback)
     {
-        $this->_setGroupOptions($options);
+        $this->setGroupOptions($options);
 
         if (is_callable($callback)) {
             $callback($this);
-            $this->_resetGroupOptions();
+            $this->resetGroupOptions();
         }
     }
 
@@ -48,18 +48,17 @@ class Router
      * @param string $httpMethod Valid Http method
      * @param string $route defined url
      * @param array|callable $controller handler for route
-     * @return $this
+     * @return Route
      */
     public function map($httpMethod, $route, $controller)
     {
-        $this->collection->addRoute($httpMethod, $route, $this->_getGroupOptions(), $controller);
-        return $this;
+        return $this->collection->addRoute($httpMethod, $route, $this->getGroupOptions(), $controller);
     }
 
     /**
      * @param string $route defined url
      * @param array|callable $controller handler for route
-     * @return Router
+     * @return Route
      */
     public function any($route, $controller)
     {
@@ -69,7 +68,7 @@ class Router
     /**
      * @param string $route defined url
      * @param array|callable $controller handler for route
-     * @return Router
+     * @return Route
      */
     public function get($route, $controller)
     {
@@ -79,7 +78,7 @@ class Router
     /**
      * @param string $route defined url
      * @param array|callable $controller handler for route
-     * @return Router
+     * @return Route
      */
     public function head($route, $controller)
     {
@@ -89,7 +88,7 @@ class Router
     /**
      * @param string $route defined url
      * @param array|callable $controller handler for route
-     * @return Router
+     * @return Route
      */
     public function post($route, $controller)
     {
@@ -99,7 +98,7 @@ class Router
     /**
      * @param string $route defined url
      * @param array|callable $controller handler for route
-     * @return Router
+     * @return Route
      */
     public function put($route, $controller)
     {
@@ -109,7 +108,7 @@ class Router
     /**
      * @param string $route defined url
      * @param array|callable $controller handler for route
-     * @return Router
+     * @return Route
      */
     public function patch($route, $controller)
     {
@@ -119,7 +118,7 @@ class Router
     /**
      * @param string $route defined url
      * @param array|callable $controller handler for route
-     * @return Router
+     * @return Route
      */
     public function delete($route, $controller)
     {
@@ -129,7 +128,7 @@ class Router
     /**
      * @param string $route defined url
      * @param array|callable $controller handler for route
-     * @return Router
+     * @return Route
      */
     public function options($route, $controller)
     {
@@ -145,32 +144,6 @@ class Router
         $this->collection->addfilter($name, $handler);
     }
 
-
-    /**
-     * @param array $options
-     * @return $this
-     */
-    public function where(array $options)
-    {
-        if (!is_array($options)) {
-            throw new BadRouteException("Options must be array");
-        }
-
-        $this->collection->addParameters($options);
-
-        return $this;
-    }
-
-    /**
-     * @param $name
-     * @return $this
-     */
-    public function name($name)
-    {
-        $this->collection->addName($name);
-        return $this;
-    }
-
     /**
      * @return array
      */
@@ -182,7 +155,7 @@ class Router
     /**
      * @param $options
      */
-    private function _setGroupOptions($options)
+    private function setGroupOptions($options)
     {
         if (!empty($this->group_options)) {
             $this->group_options[] = array_merge_recursive(end($this->group_options), $options);
@@ -194,7 +167,7 @@ class Router
     /**
      *
      */
-    private function _resetGroupOptions()
+    private function resetGroupOptions()
     {
         array_pop($this->group_options);
     }
@@ -202,7 +175,7 @@ class Router
     /**
      * @return array
      */
-    private function _getGroupOptions()
+    private function getGroupOptions()
     {
         $options = end($this->group_options);
         return (is_array($options)) ? $options : [];

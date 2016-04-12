@@ -5,8 +5,6 @@ namespace EasyRoute;
 //https://github.com/mrjgreen/phroute/tree/v3/examples
 //https://laravel.com/docs/5.2/routing#route-groups
 
-use EasyRoute\Exception\HttpRouteNotFoundException;
-
 class Route
 {
     /**
@@ -25,6 +23,11 @@ class Route
      * @var string
      */
     private $route;
+
+    /**
+     * @var string
+     */
+    private $name;
 
     /**
      * @var array
@@ -47,6 +50,11 @@ class Route
     private $parameters = [];
 
     /**
+     * @var string
+     */
+    private $close_tag = '';
+
+    /**
      * Route constructor.
      * @param $route
      * @param $options
@@ -57,56 +65,124 @@ class Route
     {
         $this->route = $route;
         $this->options = $options;
-        $this->uri = $this->_setUri();
+        $this->uri = $this->setUri();
         $this->handler = $handler;
-    }
-
-    /**
-     * @return mixed|string
-     */
-    public function getUri()
-    {
-        return $this->uri;
     }
 
     /**
      * @return string
      */
-    public function getUriRegex()
+    private function getUriRegex()
     {
-        return $this->_convertToRegex($this->getUri());
+
+        $scheme = '{_scheme:[^:]+}';
+        if (!empty($this->options['scheme'])) {
+            $scheme = $this->options['scheme'];
+        }
+        $scheme .= '://';
+
+        $host = '{_host:[^/]+}';
+        if (!empty($this->options['host'])) {
+            $host = $this->options['host'];
+        }
+
+        return $this->convertToRegex($scheme . $host . $this->uri);
+    }
+
+    /**
+     * @return string
+     */
+    private function getUriRegexPre()
+    {
+        $scheme = '{_scheme:[^:]+}';
+        if (!empty($this->options['scheme'])) {
+            $scheme = $this->options['scheme'];
+        }
+        $scheme .= '://';
+
+        $host = '{_host:[^/]+}';
+        if (!empty($this->options['host'])) {
+            $host = $this->options['host'];
+        }
+
+        return $this->convertToRegex($scheme . $host . $this->setUri(false), false);
     }
 
     /**
      * @return mixed
      */
-    public function getDomain()
+    private function getUriReverse()
     {
-        if(!empty($this->options['domain'])){
-            return $this->options['domain'];
+
+        $scheme = '{_scheme:[^:]+}';
+        if (!empty($this->options['scheme'])) {
+            $scheme = $this->options['scheme'];
+        }
+        $scheme .= '://';
+
+        $host = '{_host:[^/]+}';
+        if (!empty($this->options['host'])) {
+            $host = $this->options['host'];
+        }
+
+        return $this->setParameters($scheme . $host . $this->uri);
+    }
+
+    /**
+     * @return string
+     */
+    public function getName()
+    {
+        return $this->name;
+    }
+
+    /**
+     * @param $name
+     * @return $this
+     */
+    public function setName($name)
+    {
+        $this->name = $name;
+        return $this;
+    }
+
+    /**
+     * @param $host
+     * @return $this
+     */
+    public function setHost($host)
+    {
+        $this->options['host'] = $host;
+        return $this;
+    }
+
+    /**
+     * @param $scheme
+     * @return $this
+     */
+    public function setScheme($scheme)
+    {
+        $this->options['scheme'] = $scheme;
+        return $this;
+    }
+
+    /**
+     * @return mixed
+     */
+    private function getHost()
+    {
+        if (!empty($this->options['host'])) {
+            return $this->options['host'];
         }
 
         return '';
     }
 
     /**
-     * @param $domain
-     * @return array
-     * @throws HttpRouteNotFoundException
-     */
-    public function checkDomain($domain)
-    {
-        if ($domain) {
-            return $this->_checkDomain($domain);
-        }
-        return [];
-    }
-
-    /**
      * @param $name
      * @param $value
      */
-    public function setParameter($name, $value)
+    private function setParameter($name, $value)
     {
         $this->parameters[$name] = $value;
     }
@@ -114,7 +190,7 @@ class Route
     /**
      * @return array|bool
      */
-    public function getBefores()
+    private function getBefores()
     {
         if (empty($this->options['before'])) {
             return false;
@@ -126,7 +202,7 @@ class Route
     /**
      * @return array|bool
      */
-    public function getAfters()
+    private function getAfters()
     {
         if (empty($this->options['after'])) {
             return false;
@@ -138,7 +214,7 @@ class Route
     /**
      * @return array|callable
      */
-    public function getHandler()
+    private function getHandler()
     {
         return $this->handler;
     }
@@ -146,9 +222,9 @@ class Route
     /**
      * @return string
      */
-    public function getPrefix()
+    private function getScheme()
     {
-        return $this->_getPrefix();
+        return (!empty($this->options['scheme'])) ? $this->options['scheme'] : '';
     }
 
     /**
@@ -157,37 +233,25 @@ class Route
     public function getData()
     {
         return [
-            'after'   => $this->getAfters(),
-            'before'  => $this->getBefores(),
-            'uri'     => $this->getUri(),
-            'regex'   => $this->getUriRegex(),
-            'handler' => $this->getHandler(),
-            'domain'  => $this->getDomain(),
-            'prefix'  => $this->getPrefix()
+            'after'      => $this->getAfters(),
+            'before'     => $this->getBefores(),
+            'uri'        => $this->uri,
+            'regex'      => $this->getUriRegex(),
+            'regex_pre'  => $this->getUriRegexPre(),
+            'reverse'    => $this->getUriReverse() . $this->close_tag,
+            'parameters' => $this->parameters,
+            'handler'    => $this->getHandler(),
+            'host'       => $this->getHost(),
+            'prefix'     => $this->getPrefix(),
+            'scheme'     => $this->getScheme()
         ];
-    }
-
-    /**
-     * @param $requestdomain
-     * @return array
-     * @throws HttpRouteNotFoundException
-     */
-    private function _checkDomain($requestdomain)
-    {
-        if (!empty($this->options['domain'])) {
-            if (preg_match($this->_convertToRegex($this->options['domain']), $requestdomain, $arguments)) {
-                return $arguments;
-            }
-            throw new HttpRouteNotFoundException(404);
-        }
-        return [];
     }
 
     /**
      * @param $content
      * @return mixed
      */
-    private function _safeRegex($content)
+    private function safeRegex($content)
     {
         $f = array('(', ')');
         $r = array('\(', '\)');
@@ -197,7 +261,7 @@ class Route
     /**
      * @return string
      */
-    private function _getPrefix()
+    private function getPrefix()
     {
         $prefix = "";
         if (!empty($this->options['prefix'])) {
@@ -209,45 +273,83 @@ class Route
         return $prefix;
     }
 
+
     /**
      * @param $route
+     * @param bool $full_regex
      * @return string
      */
-    private function _convertToRegex($route)
+    private function convertToRegex($route, $full_regex = true)
     {
+        $postfix = ($full_regex) ? '[/]?$@' : '[/]?@';
+
+        $route = $this->setParameters($route);
         return '@^' . preg_replace_callback("@{([^}]+)}@", function ($match) {
-            return $this->_regexParameter($match[0]);
-        }, $route) . '[/]?$@';
+            return $this->regexParameter($match[0]);
+        }, $route) . $postfix;
+    }
+
+    /**
+     * @param $route
+     * @return mixed
+     */
+    private function setParameters($route)
+    {
+
+        $parse_route = $route;
+        $regex = "@{([^:]+)([^}]+)}@";
+        preg_match_all($regex, $route, $m);
+        if (!empty($m[0])) {
+            foreach ($m[0] as $i => $match) {
+                if (substr($m[2][$i], 0, 1) == ':') {
+                    $name = $m[1][$i];
+                    $this->setParameter($m[1][$i], substr($m[2][$i], 1));
+                } else {
+                    $name = $m[1][$i] . $m[2][$i];
+                    $this->setParameter($m[1][$i] . $m[2][$i], '');
+                }
+                $parse_route = str_replace($match, '{' . $name . '}', $parse_route);
+            }
+        }
+        return $parse_route;
     }
 
     /**
      * @param $name
      * @return string
      */
-    private function _regexParameter($name)
+    private function regexParameter($name)
     {
         $name = str_replace(array('{', '}'), array('', ''), $name);
-        $pattern = isset($this->parameters[$name]) ? $this->parameters[$name] : "[^/]+";
+        $pattern = !empty($this->parameters[$name]) ? $this->parameters[$name] : "[^/]+";
         return '(?<' . $name . '>' . $pattern . ')';
     }
 
+
     /**
+     * @param bool $full_uri
      * @return mixed
      */
-    private function _setUri()
+    private function setUri($full_uri = true)
     {
         $uri = '';
         if (!empty($this->options['base_uri'])) {
             $uri .= $this->options['base_uri'];
         }
-        if (!empty($this->_getPrefix())) {
-            $uri .= '/'. $this->_getPrefix();
+        if (!empty($this->getPrefix())) {
+            $uri .= '/' . $this->getPrefix();
         }
 
-        if(substr($this->route, -1) == '/'){
+        if (substr($this->route, -1) == '/') {
+            $this->close_tag = '/';
             $this->route = substr($this->route, 0, -1);
         }
-        return $this->_safeRegex($uri . $this->route);
+
+        if ($full_uri) {
+            return $this->safeRegex($uri . $this->route);
+        } else {
+            return $this->safeRegex($uri);
+        }
     }
 
 }

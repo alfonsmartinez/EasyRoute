@@ -11,11 +11,6 @@ class RouteCollection
     private $base_uri;
 
     /**
-     * @var  Route
-     */
-    private $lastRoute;
-
-    /**
      * @var array
      */
     private $routes = [];
@@ -23,7 +18,7 @@ class RouteCollection
     /**
      * @var array
      */
-    private $domains = [];
+    private $hosts = [];
 
     /**
      * @var array
@@ -38,7 +33,12 @@ class RouteCollection
     /**
      * @var array
      */
-    private $reverse = [];
+    protected $patternMatchers = [
+        'number'        => '[0-9]+',
+        'word'          => '[a-zA-Z]+',
+        'alphanum_dash' => '[a-zA-Z0-9-_]+',
+        'slug'          => '[a-z0-9-]+'
+    ];
 
     /**
      * RouteCollection constructor.
@@ -54,6 +54,7 @@ class RouteCollection
      * @param $route
      * @param $options
      * @param $handler
+     * @return Route
      */
     public function addRoute($httpMethod, $route, $options, $handler)
     {
@@ -61,33 +62,17 @@ class RouteCollection
             $httpMethod = array($httpMethod);
         }
 
-        $this->_setPrefixs($this->_getPrefix($options));
-        $this->_setDomains($options);
+        $this->setPrefixs($this->getPrefix($options));
+        $this->setHosts($options);
 
         $options = array_merge($options, ['base_uri' => $this->base_uri]);
-        $this->lastRoute = new Route($route, $options, $handler);
+        $route = new Route($route, $options, $handler);
 
         foreach ($httpMethod as $method) {
-            $this->routes[$method][] = $this->lastRoute->getData();
+            $this->routes[$method][] = $route;
         }
-    }
 
-    /**
-     * @param $parameters
-     */
-    public function addParameters($parameters)
-    {
-        foreach ($parameters as $name => $regex) {
-            $this->lastRoute->setParameter($name, $regex);
-        }
-    }
-
-    /**
-     * @param $name
-     */
-    public function addName($name)
-    {
-        $this->reverse[$this->lastRoute->getDomain()][$name][] = $this->lastRoute->getData();
+        return $route;
     }
 
     /**
@@ -108,8 +93,8 @@ class RouteCollection
         return [
             'base_uri' => $this->base_uri,
             'prefixs'  => $this->prefixs,
-            'routes'   => $this->_orderRoutes(),
-            'reverse'  => $this->reverse,
+            'routes'   => $this->getArrayRoutes(),
+            'reverse'  => $this->getArrayReverse(),
             'filters'  => $this->filters
         ];
     }
@@ -117,17 +102,17 @@ class RouteCollection
     /**
      * @param $options
      */
-    private function _setDomains($options)
+    private function setHosts($options)
     {
-        if (!empty($options['domain']) && !in_array($options['domain'], $this->domains)) {
-            $this->domains[] = $options['domain'];
+        if (!empty($options['host']) && !in_array($options['host'], $this->hosts)) {
+            $this->hosts[] = $options['host'];
         }
     }
 
     /**
      * @param $prefix
      */
-    private function _setPrefixs($prefix)
+    private function setPrefixs($prefix)
     {
         if (!in_array($prefix, $this->prefixs)) {
             $this->prefixs[] = $prefix;
@@ -141,7 +126,7 @@ class RouteCollection
      * @param $options
      * @return string
      */
-    private function _getPrefix($options)
+    private function getPrefix($options)
     {
         $prefix = "";
         if (!empty($options['prefix'])) {
@@ -157,14 +142,57 @@ class RouteCollection
     /**
      * @return array
      */
-    private function _orderRoutes()
+    private function getArrayReverse()
     {
-        foreach($this->routes as $method => $routes){
-            usort($this->routes[$method], function($a, $b) {
-                return $a['domain'] - $b['domain'];
-            });
+        $reverse_routes = [];
+        foreach ($this->routes as $methord => $routes) {
+            /** @var Route $route */
+            foreach ($routes as $route) {
+                if (!empty($route->getName())) {
+                    $reverse_routes[$route->getName()][] = $route->getData();
+                }
+            }
+        }
+        return $this->orderRoutes($reverse_routes);
+    }
+
+
+    /**
+     * @return array
+     */
+    private function getArrayRoutes()
+    {
+        $array_routes = [];
+        foreach ($this->routes as $method => $routes) {
+            /** @var Route $route */
+            foreach ($routes as $route) {
+                $array_routes[$method][] = $route->getData();
+            }
+        }
+        return $this->orderRoutes($array_routes);
+    }
+
+
+    /**
+     * @param $array_routes
+     * @return array
+     */
+    private function orderRoutes($array_routes)
+    {
+        foreach ($array_routes as $method => $routes) {
+
+            $schemes = [];
+            $hosts = [];
+            $prefixs = [];
+            foreach ($array_routes[$method] as $key => $row) {
+                $schemes[$key] = $row['scheme'];
+                $hosts[$key] = $row['host'];
+                $prefixs[$key] = $row['prefix'];
+            }
+
+            array_multisort($schemes, SORT_DESC, $hosts, SORT_DESC, $prefixs, SORT_DESC, $array_routes[$method]);
         }
 
-        return $this->routes;
+        return $array_routes;
     }
 }

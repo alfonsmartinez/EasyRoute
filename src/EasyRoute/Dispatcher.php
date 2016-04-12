@@ -15,57 +15,43 @@ class Dispatcher
     private $route_map = [];
 
     /**
-     * @var RequestInterface|null
+     * @var array
      */
-    private $request;
-
+    private $url_info = [
+        'scheme' => '',
+        'host'   => '',
+        'path'   => '',
+        'query'  => ''
+    ];
 
     /**
      * Dispatcher constructor.
      * @param array $data
-     * @param RequestInterface|null $request
      */
-    public function __construct(array $data, RequestInterface $request = null)
+    public function __construct(array $data)
     {
         $this->route_map = $data;
-        $this->request = $request;
-    }
-
-
-    /**
-     * @param RequestInterface|null $request
-     * @return bool|mixed|null
-     * @throws HttpRouteNotFoundException
-     * @throws \Exception
-     */
-    public function dispatch(RequestInterface $request = null)
-    {
-        $this->_setRequest($request);
-
-        $requestUrl = $this->request->getBasePath();
-
-        // Strip query string (?a=b) from Request Url
-        if (($strpos = strpos($requestUrl, '?')) !== false) {
-            $requestUrl = substr($requestUrl, 0, $strpos);
-        }
-
-
-        return $this->dispatchRequest($this->request->getMethod(), $requestUrl,
-            $this->request->getHost());
     }
 
     /**
      * @param $httpMethod
      * @param $requestUrl
-     * @param bool $domain
      * @return bool|mixed|null
      * @throws HttpMethodNotAllowedException
      * @throws HttpRouteNotFoundException
      */
-    public function dispatchRequest($httpMethod, $requestUrl, $domain = false)
+    public function dispatchRequest($httpMethod, $requestUrl)
     {
-        $this->_checkMethod($httpMethod);
-        $this->_checkBaseURI($requestUrl);
+        $httpMethod = strtoupper($httpMethod);
+
+        $this->parseUrl($requestUrl);
+        $this->checkMethod($httpMethod);
+        $this->checkBaseURI();
+
+        // Strip query string (?a=b) from Request Url
+        if (($strpos = strpos($requestUrl, '?')) !== false) {
+            $requestUrl = substr($requestUrl, 0, $strpos);
+        }
 
         if (!isset($this->route_map['routes'][null]) || !is_array($this->route_map['routes'][null])) {
             $this->route_map['routes'][null] = [];
@@ -79,31 +65,30 @@ class Dispatcher
         $flag = false;
 
         foreach ($routes as $route) {
-            $route_pattern = $route['regex'];
-            if (preg_match($route_pattern, $requestUrl, $arguments) && $domain_args = $this->_checkDomain($route,
-                    $domain)
-            ) {
 
-                $arguments["request_uri"] = $requestUrl;
-                $parameters = array_merge($domain_args, $arguments);
+            $route_pattern = $route['regex'];
+
+            if (preg_match($route_pattern, $requestUrl, $arguments)) {
+
+                $arguments['_requesturi'] = $this->url_info;
+                $arguments['_prefix'] = $route['prefix'];
 
                 // before filters //
-                if (!empty($routes['befores'])) {
-                    foreach ($routes['befores'] as $before) {
-                        if ($response = $this->_callFunction($this->route_map['filters'][$before],
-                                $parameters) !== null
-                        ) {
+                if (!empty($route['before'])) {
+                    foreach ($route['before'] as $before) {
+                        $response = $this->callFunction($this->route_map['filters'][$before], $arguments);
+                        if ($response !== null) {
                             return $response;
                         }
                     }
                 }
 
-                $response = $this->_callFunction($route['handler'], $parameters);
+                $response = $this->callFunction($route['handler'], $arguments);
 
                 // after filters //
-                if (!empty($routes['afters'])) {
-                    foreach ($routes['afters'] as $after) {
-                        $response = $this->_callFunction($this->route_map['filters'][$after], $parameters, $response);
+                if (!empty($route['after'])) {
+                    foreach ($route['after'] as $after) {
+                        $response = $this->callFunction($this->route_map['filters'][$after], $arguments, $response);
                     }
                 }
 
@@ -120,112 +105,49 @@ class Dispatcher
 
     }
 
-
     /**
      * @param $name
      * @param $options
-     * @param RequestInterface $request
+     * @param $requestUrl
      * @return mixed
      * @throws HttpRouteNotFoundException
      */
-    public function getUrl($name, $options, RequestInterface $request = null)
+    public function getUrlRequest($name, $options, $requestUrl)
     {
+        $this->parseUrl($requestUrl);
+        $this->checkBaseURI();
 
-        $this->_setRequest($request);
-
-        $domain = $request->getHost();
-        $uri = $request->getBasePath();
-
-        $this->_checkBaseURI($uri);
-
-        $uri = str_replace($this->route_map['base_uri'], "", $uri);
-        $prefix = $this->_findPrefix($uri);
-
-        $route = $this->_getRoute($name, $domain, $prefix);
-
-        $url = $route['uri'];
-        preg_match_all("@{([^}]+)}@", $url, $matches);
-        if (!empty($matches[0])) {
-            foreach ($matches[0] as $n => $match) {
-                $url = str_replace($match, $options[$n], $url);
-            }
+        if (empty($this->route_map['reverse'][$name])) {
+            throw new HttpRouteNotFoundException("Route $name not found");
         }
 
-        return $url;
+        if (count($this->route_map['reverse'][$name]) == 1) {
 
-    }
+            preg_match($this->route_map['reverse'][$name][0]['regex_pre'], $requestUrl, $arguments);
+            $options = array_merge($options, $arguments);
 
-    /**
-     * @param $name
-     * @param $options
-     * @param $uri
-     * @param string $domain
-     * @return mixed
-     * @throws HttpRouteNotFoundException
-     */
-    public function getUrlRequest($name, $options, $uri, $domain = "")
-    {
-        $this->_checkBaseURI($uri);
+            return $this->buildUrl($this->route_map['reverse'][$name][0], $options);
 
-        $uri = str_replace($this->route_map['base_uri'], "", $uri);
-        $prefix = $this->_findPrefix($uri);
-
-        $route = $this->_getRoute($name, $domain, $prefix);
-
-        $url = $route['uri'];
-        preg_match_all("@{([^}]+)}@", $url, $matches);
-        if (!empty($matches[0])) {
-            foreach ($matches[0] as $n => $match) {
-                $url = str_replace($match, $options[$n], $url);
-            }
-        }
-
-        return $url;
-
-    }
-
-    /**
-     * @param RequestInterface|null $request
-     * @throws \Exception
-     */
-    private function _setRequest(RequestInterface $request = null)
-    {
-        if (!$this->request && !$request) {
-            throw new \Exception('Request required');
-        }
-        $this->request = ($request) ? $request : $this->request;
-    }
-
-    /**
-     * @param $name
-     * @param $domain
-     * @param $prefix
-     * @return mixed
-     */
-    private function _getRoute($name, $domain, $prefix)
-    {
-        if (!empty($this->route_map['reverse'][$domain]) && !empty($this->route_map['reverse'][$domain][$name])) {
-            $route = $this->route_map['reverse'][$domain][$name];
-        } elseif (!empty($this->route_map['reverse'][''][$name])) {
-            $route = $this->route_map['reverse'][''][$name];
         } else {
-            throw new BadRouteException("Esta ruta no existe");
-        }
 
-        if (count($route) > 1) {
-            foreach ($route as $item) {
-                if ($item['prefix'] == $prefix) {
-                    $route = $item;
-                    break;
+            foreach ($this->route_map['reverse'][$name] as $item) {
+
+                $route_pattern = $item['regex_pre'];
+
+                if (preg_match($route_pattern, $requestUrl, $arguments)) {
+                    $options = array_merge($options, $arguments);
+
+                    return $this->buildUrl($item, $options);
+
                 }
+
             }
-        } else {
-            $route = $route[0];
+
         }
 
-        return $route;
-    }
+        throw new BadRouteException('Esta ruta no existe!');
 
+    }
 
     /**
      * @param $controller
@@ -233,14 +155,14 @@ class Dispatcher
      * @param null $_response
      * @return bool|mixed|null
      */
-    private function _callFunction($controller, $parameters, $_response = null)
+    private function callFunction($controller, $parameters, $_response = null)
     {
         if (!is_array($controller) && is_callable($controller)) {
-            $parameters = $this->_arrangeFuncArgs($controller, $parameters);
+            $parameters = $this->arrangeFuncArgs($controller, $parameters);
         } else {
             if (method_exists($class = $controller[0], $method = $controller[1])) {
                 $c = new $class();
-                $parameters = $this->_arrangeMethodArgs($c, $method, $parameters);
+                $parameters = $this->arrangeMethodArgs($c, $method, $parameters);
             }
         }
 
@@ -258,40 +180,21 @@ class Dispatcher
     }
 
     /**
-     * @param $uri
-     * @return string
      * @throws HttpRouteNotFoundException
      */
-    private function _findPrefix($uri)
+    private function checkBaseURI()
     {
-        foreach ($this->route_map['prefixs'] as $prefix) {
-            $prefix = substr($prefix, 1, -1);
-            if (preg_match("@$prefix@", $uri, $matches)) {
-                return $prefix;
-            }
-        }
-
-        throw new HttpRouteNotFoundException("Esta ruta no existe");
-    }
-
-    /**
-     * @param $uri
-     * @throws HttpRouteNotFoundException
-     */
-    private function _checkBaseURI($uri)
-    {
-        if (substr($uri, 0, strlen($this->route_map['base_uri'])) != $this->route_map['base_uri']) {
+        if (substr($this->url_info['path'], 0, strlen($this->route_map['base_uri'])) != $this->route_map['base_uri']) {
             throw new HttpRouteNotFoundException(404);
         }
     }
-
 
     /**
      * @param $function
      * @param $arguments
      * @return array
      */
-    private function _arrangeFuncArgs($function, $arguments)
+    private function arrangeFuncArgs($function, $arguments)
     {
         $ref = new \ReflectionFunction($function);
         return array_map(
@@ -314,7 +217,7 @@ class Dispatcher
      * @param $arguments
      * @return array
      */
-    private function _arrangeMethodArgs($class, $method, $arguments)
+    private function arrangeMethodArgs($class, $method, $arguments)
     {
         $ref = new \ReflectionMethod($class, $method);
         return array_map(
@@ -335,7 +238,7 @@ class Dispatcher
      * @param $httpMethod
      * @throws HttpMethodNotAllowedException
      */
-    private function _checkMethod($httpMethod)
+    private function checkMethod($httpMethod)
     {
 
         $httpMethod = strtoupper($httpMethod);
@@ -345,18 +248,57 @@ class Dispatcher
     }
 
     /**
-     * @param $route
-     * @param $domain
-     * @return array
+     * @param $url
      */
-    private function _checkDomain($route, $domain)
+    private function parseUrl($url)
     {
-        if (!empty($route['domain']) && $route['domain'] != $domain) {
-            return false;
-        } else {
-            return [
-                'domain' => $domain
-            ];
+        $this->url_info = array_merge($this->url_info, parse_url($url));
+    }
+
+
+    /**
+     * @param $route
+     * @param $options
+     * @return mixed
+     */
+    private function buildUrl($route, $options)
+    {
+        $url = $this->showUrl($route['reverse'], $route['parameters'], $options);
+        return $url;
+    }
+
+    /**
+     * @param $url
+     * @param $parameters
+     * @param $options
+     * @return mixed
+     */
+    private function showUrl($url, $parameters, $options)
+    {
+
+        preg_match_all("@{([^}]+)}@", $url, $matches);
+
+        if (!empty($matches[0])) {
+            foreach ($matches[0] as $n => $match) {
+                if ($match == '{_scheme}') {
+                    $url = str_replace('{_scheme}', $this->url_info['scheme'], $url);
+                } elseif ($match == '{_host}') {
+                    $url = str_replace('{_host}', $this->url_info['host'], $url);
+                } else {
+                    if (!empty($options[$matches[1][$n]])) {
+                        if(preg_match('@^'.$parameters[$matches[1][$n]].'$@', $options[$matches[1][$n]])){
+                            $url = str_replace($match, $options[$matches[1][$n]], $url);
+                        }else{
+                            $parameter = $matches[1][$n];
+                            throw new BadRouteException("El parametro $parameter es incorrecto");
+                        }
+                    } else {
+                        throw new BadRouteException('Faltan parametros para llamar a la url');
+                    }
+                }
+            }
         }
+
+        return $url;
     }
 }

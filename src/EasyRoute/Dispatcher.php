@@ -145,7 +145,7 @@ class Dispatcher
 
         }
 
-        throw new BadRouteException('Esta ruta no existe!');
+        throw new BadRouteException('Route doesnt exist');
 
     }
 
@@ -290,10 +290,10 @@ class Dispatcher
                             $url = str_replace($match, $options[$matches[1][$n]], $url);
                         }else{
                             $parameter = $matches[1][$n];
-                            throw new BadRouteException("El parametro $parameter es incorrecto");
+                            throw new BadRouteException("The paramater $parameter is invalid");
                         }
                     } else {
-                        throw new BadRouteException('Faltan parametros para llamar a la url');
+                        throw new BadRouteException('Missing parameters url');
                     }
                 }
             }

@@ -18,16 +18,176 @@ You need PHP >= 5.5 to use EasyRoute.
 
 ## Install
 
+### System Requirements
+
+You need PHP >= 5.5.0 to use EasyRoute\EasyRoute but the latest stable version of PHP is recommended.
+
+### Composer
+
+EasyRoute is available on Packagist and can be installed using Composer:
+
+```
+composer require easyroute/easyroute
+```
+
+### Manually
+
+You may use your own autoloader as long as it follows PSR-0 or PSR-4 standards. Just put src directory contents in your vendor directory.
+
+
 ## Rewrite requests
+
+To use EasyRoute, you will need to rewrite all requests to a single file.
+There are various ways to go about this, but here are examples for Apache and Nginx.
+
+### Apache .htaccess
+
+```htaccess
+Options +FollowSymLinks
+RewriteEngine On
+RewriteRule ^(.*)$ index.php [NC,L]
+```
+
+### Nginx nginx.conf
+
+```nginx
+server {
+    listen 80;
+    server_name mydevsite.dev;
+    root /var/www/mydevsite/public;
+
+    index index.php;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        # NOTE: You should have "cgi.fix_pathinfo = 0;" in php.ini
+
+        # With php5-fpm:
+        fastcgi_pass unix:/var/run/php5-fpm.sock;
+        fastcgi_index index.php;
+        include fastcgi.conf;
+        fastcgi_intercept_errors on;
+    }
+}
+```
 
 ## Map your routes
 
+```php
+
+use EasyRoute\Router;
+
+$router = new Router('/examples');
+
+$router->filter('auth', function ($_requesturi) {
+    //return 'hola auth';
+    var_dump($_requesturi);
+});
+
+$router->get('/', function () {
+    return 'hello world';
+});
+
+$router->get('/part/', function () {
+    return 'hello world part';
+})->setName('part');
+
+$router->get('/part/{id:[0-9]+}/', function ($id) {
+    return 'hello world part' . $id;
+})->setName('partid');
+
+$router->group(['before' => ['auth']], function (\EasyRoute\Router $router) {
+    $router->get('/testbefore/', function () {
+        return 'hello test before';
+    });
+});
+
+$router->group(['prefix' => 'en'], function (\EasyRoute\Router $router) {
+
+    $router->get('/', function () {
+        return 'home with prefix en';
+    })->setName('home');
+
+});
+
+$router->group(['prefix' => 'es'], function (\EasyRoute\Router $router) {
+
+    $router->get('/', function () {
+        return 'home with prefix es';
+    })->setName('home');
+
+    $router->group(['prefix' => 'admin'], function (Router $router) {
+        $router->get('/', function () {
+            return 'hola 2 prefix';
+        })->setName('prefix2');
+    });
+
+});
+
+$router->get('/home/', function () {
+    return 'home without prefix';
+})->setName('home');
+
+```
+
+
 ## Match requests
 
+```php
 
-# TODO
+$data = $router->getData();
+$dispatcher = new \EasyRoute\Dispatcher($data);
+
+$request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
+
+try {
+    echo $dispatcher->dispatchRequest($request->getMethod(), $request->getUri());
+} catch (\EasyRoute\Exception\HttpRouteNotFoundException $e) {
+    echo 'route not found';
+} catch (\EasyRoute\Exception\HttpMethodNotAllowedException $e) {
+    echo 'not method allowed';
+} catch (\Exception $e) {
+    echo 'error 500';
+}
+
+```
+
+### Dispatch url
+
+```php
+
+$data = $router->getData();
+$dispatcher = new \EasyRoute\Dispatcher($data);
+
+$request = \Symfony\Component\HttpFoundation\Request::createFromGlobals();
+
+echo $dispatcher->getUrlRequest('home', [], $request->getUri());
+echo "\n";
+echo $dispatcher->getUrlRequest('prefix2', [], $request->getUri());
+echo "\n";
+echo $dispatcher->getUrlRequest('partid', ['id' => 555], $request->getUri();
+echo "\n";
+```
+
+## TODO
 
     - add requestinterface optional (guzzle / psr7)
     - default pregmatches
     - add cache route collection
     - add cache dispatcher
+    
+## LICENSE
+
+The MIT License (MIT)
+
+Copyright (c) 2016 alfonsmartinez
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

@@ -157,22 +157,16 @@ class Dispatcher
      */
     private function callFunction($controller, $parameters, $_response = null)
     {
+        $response = false;
+
         if (!is_array($controller) && is_callable($controller)) {
             $parameters = $this->arrangeFuncArgs($controller, $parameters);
+            $response = call_user_func_array($controller, $parameters);
         } else {
             if (method_exists($class = $controller[0], $method = $controller[1])) {
                 $c = new $class();
                 $parameters = $this->arrangeMethodArgs($c, $method, $parameters);
-            }
-        }
-
-        // Run controller function or method
-        $response = false;
-        if (is_callable($controller)) {
-            $response = call_user_func_array($controller, $parameters);
-        } else {
-            if (is_array($controller)) {
-                $response = call_user_func_array($controller[0]->$controller[1], $parameters);
+                $response = call_user_func_array([$c, $method], $parameters);
             }
         }
 
